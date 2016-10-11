@@ -35,19 +35,17 @@ void* response_process(void *arg) {
             return NULL;
         }
 
-        // TODO Need to add multiple event poll to gracefully shutdown
 	ret = receive_response(conn, resp);
         while (ret == 0) {
-                /*
-                if (resp->Seq % 1024 == 0) {
-                        printf("Received seq %d\n", resp->Seq);
+                if (resp->Type == TypeRead || resp->Type == TypeWrite) {
+                        fprintf(stderr, "Wrong type for response %d of seq %d\n",
+                                        resp->Seq, resp->Type);
+                        continue;
                 }
-                */
 
                 if (resp->Type != TypeResponse) {
-                        fprintf(stderr, "Wrong type for response of seq %d\n",
-                                        resp->Seq);
-                        continue;
+                        fprintf(stderr, "Receive type for response %d of seq %d\n",
+                                        resp->Seq, resp->Type);
                 }
 
                 pthread_mutex_lock(&conn->mutex);
@@ -87,7 +85,7 @@ int new_seq(struct client_connection *conn) {
         return __sync_fetch_and_add(&conn->seq, 1);
 }
 
-int process_request(struct client_connection *conn, void *buf, size_t count, off_t offset, 
+int process_request(struct client_connection *conn, void *buf, size_t count, off_t offset,
                 uint32_t type) {
         struct Message *req = malloc(sizeof(struct Message));
         int rc = 0;
