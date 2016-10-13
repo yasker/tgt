@@ -37,15 +37,21 @@ void* response_process(void *arg) {
 
 	ret = receive_response(conn, resp);
         while (ret == 0) {
-                if (resp->Type == TypeRead || resp->Type == TypeWrite) {
+                switch (resp->Type) {
+                case TypeRead:
+                case TypeWrite:
                         fprintf(stderr, "Wrong type for response %d of seq %d\n",
-                                        resp->Seq, resp->Type);
+                                        resp->Type, resp->Seq);
                         continue;
-                }
-
-                if (resp->Type != TypeResponse) {
-                        fprintf(stderr, "Receive type for response %d of seq %d\n",
-                                        resp->Seq, resp->Type);
+                case TypeError:
+                        fprintf(stderr, "Receive error for response %d of seq %d: %s\n",
+                                        resp->Type, resp->Seq, (char *)resp->Data);
+                        /* fall through so we can response to caller */
+                case TypeEOF:
+                case TypeResponse:
+                        break;
+                default:
+                        fprintf(stderr, "Unknown message type %d\n", resp->Type);
                 }
 
                 pthread_mutex_lock(&conn->mutex);
@@ -56,8 +62,14 @@ void* response_process(void *arg) {
                 pthread_mutex_unlock(&conn->mutex);
 
                 pthread_mutex_lock(&req->mutex);
-                memcpy(req->Data, resp->Data, req->DataLength);
+                if (resp->Type == TypeResponse || resp->Type == TypeEOF) {
+                        req->DataLength = resp->DataLength;
+                        memcpy(req->Data, resp->Data, req->DataLength);
+                } else if (resp->Type == TypeError) {
+                        req->Type = TypeError;
+                }
                 free(resp->Data);
+
                 pthread_mutex_unlock(&req->mutex);
 
                 pthread_cond_signal(&req->cond);
@@ -134,6 +146,10 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
         }
 
         pthread_cond_wait(&req->cond, &req->mutex);
+
+        if (req->Type == TypeError) {
+                rc = -EFAULT;
+        }
 out:
         pthread_mutex_unlock(&req->mutex);
 free:
