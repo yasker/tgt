@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "log.h"
 #include "longhorn-rpc-protocol.h"
 
 int read_full(int fd, void *buf, int len) {
@@ -37,22 +38,22 @@ int send_msg(int fd, struct Message *msg) {
 
         n = write_full(fd, &msg->Seq, sizeof(msg->Seq));
         if (n != sizeof(msg->Seq)) {
-                fprintf(stderr, "fail to write seq\n");
+                eprintf("fail to write seq\n");
                 return -EINVAL;
         }
         n = write_full(fd, &msg->Type, sizeof(msg->Type));
         if (n != sizeof(msg->Type)) {
-                fprintf(stderr, "fail to write type\n");
+                eprintf("fail to write type\n");
                 return -EINVAL;
         }
         n = write_full(fd, &msg->Offset, sizeof(msg->Offset));
         if (n != sizeof(msg->Offset)) {
-                fprintf(stderr, "fail to write offset\n");
+                eprintf("fail to write offset\n");
                 return -EINVAL;
         }
         n = write_full(fd, &msg->DataLength, sizeof(msg->DataLength));
         if (n != sizeof(msg->DataLength)) {
-                fprintf(stderr, "fail to write datalength\n");
+                eprintf("fail to write datalength\n");
                 return -EINVAL;
         }
 	if (msg->DataLength != 0) {
@@ -60,7 +61,7 @@ int send_msg(int fd, struct Message *msg) {
 		if (n != msg->DataLength) {
                         if (n < 0)
                                 perror("fail writing data");
-			fprintf(stderr, "fail to write data, written %d expected %d\n",
+			eprintf("fail to write data, written %d expected %d\n",
                                         n, msg->DataLength);
                         return -EINVAL;
 		}
@@ -78,22 +79,22 @@ int receive_msg(int fd, struct Message *msg) {
         // full-duplex, so no need to lock
 	n = read_full(fd, &msg->Seq, sizeof(msg->Seq));
         if (n != sizeof(msg->Seq)) {
-                fprintf(stderr, "fail to write seq\n");
+                eprintf("fail to write seq\n");
 		return -EINVAL;
         }
         n = read_full(fd, &msg->Type, sizeof(msg->Type));
         if (n != sizeof(msg->Type)) {
-                fprintf(stderr, "fail to read type\n");
+                eprintf("fail to read type\n");
 		return -EINVAL;
         }
         n = read_full(fd, &msg->Offset, sizeof(msg->Offset));
         if (n != sizeof(msg->Offset)) {
-                fprintf(stderr, "fail to read offset\n");
+                eprintf("fail to read offset\n");
 		return -EINVAL;
         }
         n = read_full(fd, &msg->DataLength, sizeof(msg->DataLength));
         if (n != sizeof(msg->DataLength)) {
-                fprintf(stderr, "fail to read datalength\n");
+                eprintf("fail to read datalength\n");
 		return -EINVAL;
         }
 
@@ -105,7 +106,7 @@ int receive_msg(int fd, struct Message *msg) {
                 }
 		n = read_full(fd, msg->Data, msg->DataLength);
 		if (n != msg->DataLength) {
-                        fprintf(stderr, "Cannot read full from fd, %d vs %d\n",
+                        eprintf("Cannot read full from fd, %d vs %d\n",
                                 msg->DataLength, n);
 			free(msg->Data);
 			return -EINVAL;

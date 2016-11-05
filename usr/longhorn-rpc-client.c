@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include "log.h"
 #include "longhorn-rpc-client.h"
 #include "longhorn-rpc-protocol.h"
 
@@ -43,18 +44,18 @@ void* response_process(void *arg) {
                 switch (resp->Type) {
                 case TypeRead:
                 case TypeWrite:
-                        fprintf(stderr, "Wrong type for response %d of seq %d\n",
+                        eprintf("Wrong type for response %d of seq %d\n",
                                         resp->Type, resp->Seq);
                         continue;
                 case TypeError:
-                        fprintf(stderr, "Receive error for response %d of seq %d: %s\n",
+                        eprintf("Receive error for response %d of seq %d: %s\n",
                                         resp->Type, resp->Seq, (char *)resp->Data);
                         /* fall through so we can response to caller */
                 case TypeEOF:
                 case TypeResponse:
                         break;
                 default:
-                        fprintf(stderr, "Unknown message type %d\n", resp->Type);
+                        eprintf("Unknown message type %d\n", resp->Type);
                 }
 
                 pthread_mutex_lock(&conn->mutex);
@@ -81,7 +82,7 @@ void* response_process(void *arg) {
         }
         free(resp);
         if (ret != 0) {
-                fprintf(stderr, "Receive response returned error");
+                eprintf("Receive response returned error");
         }
         return NULL;
 }
@@ -111,7 +112,7 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
         }
 
         if (type != TypeRead && type != TypeWrite) {
-                fprintf(stderr, "BUG: Invalid type for process_request %d\n", type);
+                eprintf("BUG: Invalid type for process_request %d\n", type);
                 rc = -EFAULT;
                 goto free;
         }
@@ -183,7 +184,7 @@ struct client_connection *new_client_connection(char *socket_path) {
         memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         if (strlen(socket_path) >= 108) {
-                fprintf(stderr, "socket path is too long, more than 108 characters");
+                eprintf("socket path is too long, more than 108 characters");
                 exit(-EINVAL);
         }
 
