@@ -8,6 +8,9 @@
 #include "longhorn-rpc-client.h"
 #include "longhorn-rpc-protocol.h"
 
+int retry_interval = 5;
+int retry_counts = 5;
+
 int send_request(struct client_connection *conn, struct Message *req) {
         int rc = 0;
 
@@ -169,6 +172,7 @@ struct client_connection *new_client_connection(char *socket_path) {
         struct sockaddr_un addr;
         int fd, rc = 0;
         struct client_connection *conn = NULL;
+        int i, connected = 0;
 
         fd = socket(AF_UNIX, SOCK_STREAM, 0);
         if (fd == -1) {
@@ -185,8 +189,16 @@ struct client_connection *new_client_connection(char *socket_path) {
 
         strncpy(addr.sun_path, socket_path, strlen(socket_path));
 
-        if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-                perror("connect error");
+        for (i = 0; i < retry_counts; i ++) {
+                if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+                        connected = 1;
+                        break;
+                }
+                perror("Cannot connect, retrying");
+                sleep(retry_interval);
+        }
+        if (!connected) {
+                perror("connection error");
                 exit(-EFAULT);
         }
 
