@@ -77,6 +77,7 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	case WRITE_6:
 	case WRITE_10:
 	case WRITE_12:
+                eprintf("receive write at %lx for %u\n", cmd->offset, length);
 		length = scsi_get_out_length(cmd);
 		ret = write_at(lh->conn, scsi_get_out_buffer(cmd),
 			    length, cmd->offset);
@@ -84,11 +85,13 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
                         eprintf("fail to write at %lx for %u\n", cmd->offset, length);
 			set_medium_error(&result, &key, &asc);
                 }
+                eprintf("write at %lx for %u done\n", cmd->offset, length);
 		break;
 	case READ_6:
 	case READ_10:
 	case READ_12:
 	case READ_16:
+                eprintf("receive read at %lx for %u\n", cmd->offset, length);
 		length = scsi_get_in_length(cmd);
 		ret = read_at(lh->conn, scsi_get_in_buffer(cmd),
 			    length, cmd->offset);
@@ -96,6 +99,7 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
                         eprintf("fail to read at %lx for %u\n", cmd->offset, length);
 			set_medium_error(&result, &key, &asc);
                 }
+                eprintf("read at %lx for %u\n", cmd->offset, length);
 		break;
 	default:
 		eprintf("cmd->scb[0]: %x\n", cmd->scb[0]);
