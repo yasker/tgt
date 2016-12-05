@@ -77,8 +77,8 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	case WRITE_6:
 	case WRITE_10:
 	case WRITE_12:
-                eprintf("receive write at %lx for %u\n", cmd->offset, length);
 		length = scsi_get_out_length(cmd);
+                eprintf("receive write at %lx for %u\n", cmd->offset, length);
 		ret = write_at(lh->conn, scsi_get_out_buffer(cmd),
 			    length, cmd->offset);
 		if (ret) {
@@ -91,8 +91,8 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	case READ_10:
 	case READ_12:
 	case READ_16:
-                eprintf("receive read at %lx for %u\n", cmd->offset, length);
 		length = scsi_get_in_length(cmd);
+                eprintf("receive read at %lx for %u\n", cmd->offset, length);
 		ret = read_at(lh->conn, scsi_get_in_buffer(cmd),
 			    length, cmd->offset);
 		if (ret) {
@@ -144,6 +144,7 @@ static int bs_longhorn_open(struct scsi_lu *lu, char *path,
 static void bs_longhorn_close(struct scsi_lu *lu)
 {
 	if (LHP(lu)->conn) {
+                dprintf("close longhorn connection");
 		shutdown_client_connection(LHP(lu)->conn);
 	}
 }

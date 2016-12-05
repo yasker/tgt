@@ -9,11 +9,17 @@ struct client_connection {
         int seq;  // must be atomic
         int fd;
         int notify_fd;
+        int state;
 
         pthread_t response_thread;
 
         struct Message *msg_table;
         pthread_mutex_t mutex;
+};
+
+enum {
+        CLIENT_CONN_STATE_OPEN = 0,
+        CLIENT_CONN_STATE_CLOSE,
 };
 
 struct client_connection *new_client_connection(char *socket_path);

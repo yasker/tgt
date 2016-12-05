@@ -39,8 +39,12 @@ void* response_process(void *arg) {
             return NULL;
         }
 
-	ret = receive_response(conn, resp);
-        while (ret == 0) {
+        while (1) {
+                ret = receive_response(conn, resp);
+                if (ret != 0) {
+                        break;
+                }
+
                 switch (resp->Type) {
                 case TypeRead:
                 case TypeWrite:
@@ -65,6 +69,12 @@ void* response_process(void *arg) {
                 }
                 pthread_mutex_unlock(&conn->mutex);
 
+                if (req == NULL) {
+                        eprintf("Unknown response sequence %d\n", resp->Seq);
+                        free(resp->Data);
+                        continue;
+                }
+
                 pthread_mutex_lock(&req->mutex);
                 if (resp->Type == TypeResponse || resp->Type == TypeEOF) {
                         req->DataLength = resp->DataLength;
@@ -77,8 +87,6 @@ void* response_process(void *arg) {
                 pthread_mutex_unlock(&req->mutex);
 
                 pthread_cond_signal(&req->cond);
-
-                ret = receive_response(conn, resp);
         }
         free(resp);
         if (ret != 0) {
@@ -140,6 +148,12 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
         }
 
         pthread_mutex_lock(&conn->mutex);
+        if (conn->state != CLIENT_CONN_STATE_OPEN) {
+                eprintf("Cannot queue in more request. Connection is not open");
+                rc = -EINVAL;
+                goto free;
+        }
+
         HASH_ADD_INT(conn->msg_table, Seq, req);
         pthread_mutex_unlock(&conn->mutex);
 
@@ -194,7 +208,8 @@ struct client_connection *new_client_connection(char *socket_path) {
                 if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
                         connected = 1;
                         break;
-                }
+		}
+
                 perror("Cannot connect, retrying");
                 sleep(retry_interval);
         }
@@ -218,10 +233,29 @@ struct client_connection *new_client_connection(char *socket_path) {
                 perror("fail to init conn->mutex");
                 exit(-EFAULT);
         }
+
+        conn->state = CLIENT_CONN_STATE_OPEN;
         return conn;
 }
 
 int shutdown_client_connection(struct client_connection *conn) {
+        struct Message *req, *tmp;
+        pthread_mutex_lock(&conn->mutex);
+        // Prevent future requests
+        conn->state = CLIENT_CONN_STATE_CLOSE;
+
+        // Clean up and fail all pending requests
+        HASH_ITER(hh, conn->msg_table, req, tmp) {
+                HASH_DEL(conn->msg_table, req);
+
+                pthread_mutex_lock(&req->mutex);
+                req->Type = TypeError;
+                eprintf("Cancel request %d due to disconnection", req->Seq);
+                pthread_mutex_unlock(&req->mutex);
+                pthread_cond_signal(&req->cond);
+        }
+        pthread_mutex_unlock(&conn->mutex);
+
         close(conn->fd);
         free(conn);
         return 0;
