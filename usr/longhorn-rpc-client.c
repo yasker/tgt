@@ -67,9 +67,9 @@ void* response_process(void *arg) {
                 }
 
                 pthread_mutex_lock(&conn->mutex);
-                HASH_FIND_INT(conn->msg_table, &resp->Seq, req);
+                HASH_FIND_INT(conn->msg_hashtable, &resp->Seq, req);
                 if (req != NULL) {
-                        HASH_DEL(conn->msg_table, req);
+                        HASH_DEL(conn->msg_hashtable, req);
                 }
                 pthread_mutex_unlock(&conn->mutex);
 
@@ -134,7 +134,7 @@ void request_timeout_handler(union sigval val) {
                 return;
         }
         pthread_mutex_lock(&conn->mutex);
-        HASH_DEL(conn->msg_table, req);
+        HASH_DEL(conn->msg_hashtable, req);
         pthread_mutex_unlock(&conn->mutex);
 
         pthread_mutex_lock(&req->mutex);
@@ -158,7 +158,7 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
                 return -EINVAL;
         }
 
-        HASH_ADD_INT(conn->msg_table, Seq, req);
+        HASH_ADD_INT(conn->msg_hashtable, Seq, req);
         pthread_mutex_unlock(&conn->mutex);
 
         if (req == NULL) {
@@ -289,7 +289,7 @@ struct client_connection *new_client_connection(char *socket_path) {
 
         conn->fd = fd;
         conn->seq = 0;
-        conn->msg_table = NULL;
+        conn->msg_hashtable = NULL;
 
         rc = pthread_mutex_init(&conn->mutex, NULL);
         if (rc < 0) {
@@ -308,8 +308,8 @@ int shutdown_client_connection(struct client_connection *conn) {
         conn->state = CLIENT_CONN_STATE_CLOSE;
 
         // Clean up and fail all pending requests
-        HASH_ITER(hh, conn->msg_table, req, tmp) {
-                HASH_DEL(conn->msg_table, req);
+        HASH_ITER(hh, conn->msg_hashtable, req, tmp) {
+                HASH_DEL(conn->msg_hashtable, req);
 
                 pthread_mutex_lock(&req->mutex);
                 req->Type = TypeError;

@@ -13,7 +13,7 @@ struct client_connection {
 
         pthread_t response_thread;
 
-        struct Message *msg_table;
+        struct Message *msg_hashtable;
         pthread_mutex_t mutex;
 };
 
