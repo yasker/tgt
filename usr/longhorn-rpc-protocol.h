@@ -2,6 +2,7 @@
 #define LONGHORN_RPC_PROTOCOL_HEADER
 
 #include <pthread.h>
+#include <time.h>
 
 #include "uthash.h"
 
@@ -14,8 +15,9 @@ struct Message {
 
 	pthread_cond_t  cond;
 	pthread_mutex_t mutex;
+        timer_t         timer;
 
-        UT_hash_handle hh;
+        UT_hash_handle  hh;
 };
 
 enum uint32_t {

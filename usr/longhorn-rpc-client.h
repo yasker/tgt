@@ -22,6 +22,11 @@ enum {
         CLIENT_CONN_STATE_CLOSE,
 };
 
+struct timeout_val {
+        struct client_connection *conn;
+        struct Message *msg;
+};
+
 struct client_connection *new_client_connection(char *socket_path);
 int shutdown_client_connection(struct client_connection *conn);
 

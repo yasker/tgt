@@ -4,6 +4,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <time.h>
+#include <signal.h>
 
 #include "log.h"
 #include "longhorn-rpc-client.h"
@@ -11,6 +13,7 @@
 
 int retry_interval = 5;
 int retry_counts = 5;
+int request_timeout_period = 15; //seconds
 
 int send_request(struct client_connection *conn, struct Message *req) {
         int rc = 0;
@@ -31,6 +34,7 @@ int receive_response(struct client_connection *conn, struct Message *resp) {
 void* response_process(void *arg) {
         struct client_connection *conn = arg;
         struct Message *req, *resp;
+        struct itimerspec its;
         int ret = 0;
 
 	resp = malloc(sizeof(struct Message));
@@ -76,6 +80,18 @@ void* response_process(void *arg) {
                 }
 
                 pthread_mutex_lock(&req->mutex);
+
+                //disarm timer
+                its.it_value.tv_sec = 0;
+                its.it_value.tv_nsec = 0;
+                its.it_interval.tv_sec = 0;
+                its.it_interval.tv_nsec = 0;
+                ret = timer_settime(req->timer, 0, &its, NULL);
+                if (ret < 0) {
+                        perror("Fail to disarm the request timer");
+                }
+                eprintf("timer disarmed\n");
+
                 if (resp->Type == TypeResponse || resp->Type == TypeEOF) {
                         req->DataLength = resp->DataLength;
                         memcpy(req->Data, resp->Data, req->DataLength);
@@ -109,10 +125,41 @@ int new_seq(struct client_connection *conn) {
         return __sync_fetch_and_add(&conn->seq, 1);
 }
 
+void request_timeout_handler(union sigval val) {
+        struct timeout_val *tv = val.sival_ptr;
+        struct client_connection *conn = tv->conn;
+        struct Message *req = tv->msg;
+
+        if (req== NULL) {
+                return;
+        }
+        pthread_mutex_lock(&conn->mutex);
+        HASH_DEL(conn->msg_table, req);
+        pthread_mutex_unlock(&conn->mutex);
+
+        pthread_mutex_lock(&req->mutex);
+        req->Type = TypeError;
+        eprintf("Timeout request %d due to disconnection", req->Seq);
+        pthread_mutex_unlock(&req->mutex);
+        pthread_cond_signal(&req->cond);
+}
+
 int process_request(struct client_connection *conn, void *buf, size_t count, off_t offset,
                 uint32_t type) {
         struct Message *req = malloc(sizeof(struct Message));
+        struct sigevent sevp;
+        struct itimerspec its;
+        struct timeout_val *tv = malloc(sizeof(struct timeout_val));
         int rc = 0;
+
+        pthread_mutex_lock(&conn->mutex);
+        if (conn->state != CLIENT_CONN_STATE_OPEN) {
+                eprintf("Cannot queue in more request. Connection is not open");
+                return -EINVAL;
+        }
+
+        HASH_ADD_INT(conn->msg_table, Seq, req);
+        pthread_mutex_unlock(&conn->mutex);
 
         if (req == NULL) {
                 perror("cannot allocate memory for req");
@@ -147,21 +194,36 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
                 goto free;
         }
 
-        pthread_mutex_lock(&conn->mutex);
-        if (conn->state != CLIENT_CONN_STATE_OPEN) {
-                eprintf("Cannot queue in more request. Connection is not open");
-                rc = -EINVAL;
+        tv->conn = conn;
+        tv->msg = req;
+
+        sevp.sigev_notify = SIGEV_THREAD;
+        sevp.sigev_notify_function = request_timeout_handler;
+        sevp.sigev_notify_attributes = NULL;
+        sevp.sigev_value.sival_ptr = tv;
+        rc = timer_create(CLOCK_MONOTONIC, &sevp, &req->timer);
+        if (rc < 0) {
+                perror("Fail to init timer for request");
+                rc = -EFAULT;
                 goto free;
         }
-
-        HASH_ADD_INT(conn->msg_table, Seq, req);
-        pthread_mutex_unlock(&conn->mutex);
 
         pthread_mutex_lock(&req->mutex);
         rc = send_request(conn, req);
         if (rc < 0) {
                 goto out;
         }
+        //arm timer
+        its.it_value.tv_sec = request_timeout_period;
+        its.it_value.tv_nsec = 0;
+        its.it_interval.tv_sec = 0;
+        its.it_interval.tv_nsec = 0;
+        rc = timer_settime(req->timer, 0, &its, NULL);
+        if (rc < 0) {
+                perror("Fail to arm the request timer");
+                goto out;
+        }
+        eprintf("timer armed\n");
 
         pthread_cond_wait(&req->cond, &req->mutex);
 
@@ -171,6 +233,7 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
 out:
         pthread_mutex_unlock(&req->mutex);
 free:
+        free(tv);
         free(req);
         return rc;
 }

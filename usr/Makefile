@@ -49,7 +49,7 @@ CFLAGS += -Wall -Wstrict-prototypes -Werror -fPIC
 CFLAGS += -DTGT_VERSION=\"$(VERSION)$(EXTRAVERSION)\"
 CFLAGS += -DBSDIR=\"$(DESTDIR)$(libdir)/backing-store\"
 
-LIBS += -lpthread -ldl
+LIBS += -lpthread -ldl -lrt
 
 ifneq ($(SD_NOTIFY),)
 LIBS += -lsystemd
