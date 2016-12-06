@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "uthash.h"
+#include "utlist.h"
 
 struct Message {
         uint32_t        Seq;
@@ -15,9 +16,11 @@ struct Message {
 
 	pthread_cond_t  cond;
 	pthread_mutex_t mutex;
-        timer_t         timer;
 
         UT_hash_handle  hh;
+
+        struct Message *next, *prev;
+        struct timespec expiration;
 };
 
 enum uint32_t {

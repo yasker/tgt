@@ -9,22 +9,21 @@ struct client_connection {
         int seq;  // must be atomic
         int fd;
         int notify_fd;
+        int timeout_fd;
         int state;
+        pthread_mutex_t mutex;
 
         pthread_t response_thread;
+        pthread_t timeout_thread;
 
         struct Message *msg_hashtable;
-        pthread_mutex_t mutex;
+        struct Message *msg_list;
+        pthread_mutex_t msg_mutex;
 };
 
 enum {
         CLIENT_CONN_STATE_OPEN = 0,
         CLIENT_CONN_STATE_CLOSE,
-};
-
-struct timeout_val {
-        struct client_connection *conn;
-        struct Message *msg;
 };
 
 struct client_connection *new_client_connection(char *socket_path);
