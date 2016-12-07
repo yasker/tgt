@@ -157,7 +157,7 @@ void* response_process(void *arg) {
         }
         free(resp);
         if (ret != 0) {
-                eprintf("Receive response returned error");
+                eprintf("Receive response returned error\n");
         }
         shutdown_client_connection(conn);
         return NULL;
@@ -251,7 +251,7 @@ int process_request(struct client_connection *conn, void *buf, size_t count, off
 
         pthread_mutex_lock(&conn->mutex);
         if (conn->state != CLIENT_CONN_STATE_OPEN) {
-                eprintf("Cannot queue in more request. Connection is not open");
+                eprintf("Cannot queue in more request. Connection is not open\n");
                 pthread_mutex_unlock(&conn->mutex);
                 return -EFAULT;
         }
@@ -333,7 +333,7 @@ struct client_connection *new_client_connection(char *socket_path) {
         memset(&addr, 0, sizeof(addr));
         addr.sun_family = AF_UNIX;
         if (strlen(socket_path) >= 108) {
-                eprintf("socket path is too long, more than 108 characters");
+                eprintf("socket path is too long, more than 108 characters\n");
                 exit(-EINVAL);
         }
 
@@ -387,7 +387,7 @@ int shutdown_client_connection(struct client_connection *conn) {
                 return 0;
         }
 
-        eprintf("Shutdown connection");
+        eprintf("Shutdown connection\n");
 
         pthread_mutex_lock(&conn->mutex);
         if  (conn->state == CLIENT_CONN_STATE_CLOSE) {
@@ -409,7 +409,7 @@ int shutdown_client_connection(struct client_connection *conn) {
 
                 pthread_mutex_lock(&req->mutex);
                 req->Type = TypeError;
-                eprintf("Cancel request %d due to disconnection", req->Seq);
+                eprintf("Cancel request %d due to disconnection\n", req->Seq);
                 pthread_mutex_unlock(&req->mutex);
                 pthread_cond_signal(&req->cond);
         }
@@ -417,6 +417,6 @@ int shutdown_client_connection(struct client_connection *conn) {
 
         free(conn);
         conn = NULL;
-        eprintf("Shutdown complete");
+        eprintf("Shutdown complete\n");
         return 0;
 }

@@ -120,7 +120,7 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 static int lh_open(struct longhorn_info *lh, char *socket_path) {
 	lh->conn = new_client_connection(socket_path);
 	if (lh->conn == NULL) {
-		eprintf("Cannot estibalish connection");
+		eprintf("Cannot estibalish connection\n");
 		return -1;
 	}
 	start_response_processing(lh->conn);
@@ -144,7 +144,7 @@ static int bs_longhorn_open(struct scsi_lu *lu, char *path,
 static void bs_longhorn_close(struct scsi_lu *lu)
 {
 	if (LHP(lu)->conn) {
-                dprintf("close longhorn connection");
+                dprintf("close longhorn connection\n");
 		shutdown_client_connection(LHP(lu)->conn);
 	}
 }
