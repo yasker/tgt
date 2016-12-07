@@ -113,6 +113,11 @@ void* response_process(void *arg) {
                         break;
                 }
 
+                if (resp->Type == TypeEOF) {
+                        eprintf("Receive EOF, about to end the connection\n");
+                        break;
+                }
+
                 switch (resp->Type) {
                 case TypeRead:
                 case TypeWrite:
@@ -123,7 +128,6 @@ void* response_process(void *arg) {
                         eprintf("Receive error for response %d of seq %d: %s\n",
                                         resp->Type, resp->Seq, (char *)resp->Data);
                         /* fall through so we can response to caller */
-                case TypeEOF:
                 case TypeResponse:
                         break;
                 default:
@@ -155,6 +159,7 @@ void* response_process(void *arg) {
         if (ret != 0) {
                 eprintf("Receive response returned error");
         }
+        shutdown_client_connection(conn);
         return NULL;
 }
 
@@ -377,9 +382,23 @@ struct client_connection *new_client_connection(char *socket_path) {
 
 int shutdown_client_connection(struct client_connection *conn) {
         struct Message *req, *tmp;
+
+        if (conn == NULL) {
+                return 0;
+        }
+
+        eprintf("Shutdown connection");
+
         pthread_mutex_lock(&conn->mutex);
+        if  (conn->state == CLIENT_CONN_STATE_CLOSE) {
+                pthread_mutex_unlock(&conn->mutex);
+                return 0;
+        }
+
         // Prevent future requests
         conn->state = CLIENT_CONN_STATE_CLOSE;
+        close(conn->timeout_fd);
+        close(conn->fd);
         pthread_mutex_unlock(&conn->mutex);
 
         pthread_mutex_lock(&conn->msg_mutex);
@@ -396,7 +415,8 @@ int shutdown_client_connection(struct client_connection *conn) {
         }
         pthread_mutex_unlock(&conn->msg_mutex);
 
-        close(conn->fd);
         free(conn);
+        conn = NULL;
+        eprintf("Shutdown complete");
         return 0;
 }
