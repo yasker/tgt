@@ -44,10 +44,10 @@
 #include "scsi.h"
 #include "bs_thread.h"
 
-#include "longhorn-rpc-client.h"
+#include "liblonghorn.h"
 
 struct longhorn_info {
-	struct client_connection *conn;
+	struct lh_client_conn *conn;
 	size_t size;
 };
 
@@ -79,7 +79,7 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	case WRITE_12:
 		length = scsi_get_out_length(cmd);
                 eprintf("receive write at %lx for %u\n", cmd->offset, length);
-		ret = write_at(lh->conn, scsi_get_out_buffer(cmd),
+		ret = lh_client_write_at(lh->conn, scsi_get_out_buffer(cmd),
 			    length, cmd->offset);
 		if (ret) {
                         eprintf("fail to write at %lx for %u\n", cmd->offset, length);
@@ -93,7 +93,7 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	case READ_16:
 		length = scsi_get_in_length(cmd);
                 eprintf("receive read at %lx for %u\n", cmd->offset, length);
-		ret = read_at(lh->conn, scsi_get_in_buffer(cmd),
+		ret = lh_client_read_at(lh->conn, scsi_get_in_buffer(cmd),
 			    length, cmd->offset);
 		if (ret) {
                         eprintf("fail to read at %lx for %u\n", cmd->offset, length);
@@ -118,12 +118,12 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 }
 
 static int lh_open(struct longhorn_info *lh, char *socket_path) {
-	lh->conn = new_client_connection(socket_path);
+	lh->conn = lh_client_open_conn(socket_path);
 	if (lh->conn == NULL) {
 		eprintf("Cannot estibalish connection\n");
 		return -1;
 	}
-	start_response_processing(lh->conn);
+	lh_client_start_process(lh->conn);
         return 0;
 }
 
@@ -145,7 +145,7 @@ static void bs_longhorn_close(struct scsi_lu *lu)
 {
 	if (LHP(lu)->conn) {
                 dprintf("close longhorn connection\n");
-		shutdown_client_connection(LHP(lu)->conn);
+		lh_client_close_conn(LHP(lu)->conn);
 	}
 }
 

@@ -49,7 +49,7 @@ CFLAGS += -Wall -Wstrict-prototypes -Werror -fPIC
 CFLAGS += -DTGT_VERSION=\"$(VERSION)$(EXTRAVERSION)\"
 CFLAGS += -DBSDIR=\"$(DESTDIR)$(libdir)/backing-store\"
 
-LIBS += -lpthread -ldl -lrt
+LIBS += -lpthread -ldl -lrt -llonghorn
 
 ifneq ($(SD_NOTIFY),)
 LIBS += -lsystemd
@@ -59,8 +59,8 @@ PROGRAMS += tgtd tgtadm tgtimg
 TGTD_OBJS += tgtd.o mgmt.o target.o scsi.o log.o driver.o util.o work.o \
 		concat_buf.o parser.o spc.o sbc.o mmc.o osd.o scc.o smc.o \
 		ssc.o libssc.o bs_rdwr.o bs_ssc.o \
-		bs_longhorn.o longhorn-rpc-client.o longhorn-rpc-protocol.o \
-		bs_null.o bs_sg.o bs.o libcrc32c.o bs_sheepdog.o
+		bs_null.o bs_sg.o bs.o libcrc32c.o bs_sheepdog.o \
+		bs_longhorn.o
 
 TGTD_DEP = $(TGTD_OBJS:.o=.d)
 
