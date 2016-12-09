@@ -78,28 +78,24 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	case WRITE_10:
 	case WRITE_12:
 		length = scsi_get_out_length(cmd);
-                eprintf("receive write at %lx for %u\n", cmd->offset, length);
 		ret = lh_client_write_at(lh->conn, scsi_get_out_buffer(cmd),
 			    length, cmd->offset);
 		if (ret) {
                         eprintf("fail to write at %lx for %u\n", cmd->offset, length);
 			set_medium_error(&result, &key, &asc);
                 }
-                eprintf("write at %lx for %u done\n", cmd->offset, length);
 		break;
 	case READ_6:
 	case READ_10:
 	case READ_12:
 	case READ_16:
 		length = scsi_get_in_length(cmd);
-                eprintf("receive read at %lx for %u\n", cmd->offset, length);
 		ret = lh_client_read_at(lh->conn, scsi_get_in_buffer(cmd),
 			    length, cmd->offset);
 		if (ret) {
                         eprintf("fail to read at %lx for %u\n", cmd->offset, length);
 			set_medium_error(&result, &key, &asc);
                 }
-                eprintf("read at %lx for %u\n", cmd->offset, length);
 		break;
 	default:
 		eprintf("cmd->scb[0]: %x\n", cmd->scb[0]);
@@ -117,25 +113,17 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 	}
 }
 
-static int lh_open(struct longhorn_info *lh, char *socket_path) {
-	lh->conn = lh_client_open_conn(socket_path);
-	if (lh->conn == NULL) {
-		eprintf("Cannot estibalish connection\n");
-		return -1;
-	}
-	lh_client_start_process(lh->conn);
-        return 0;
-}
-
 static int bs_longhorn_open(struct scsi_lu *lu, char *path,
 			    int *fd, uint64_t *size)
 {
 	struct longhorn_info *lh = LHP(lu);
-	int ret;
+	int rc;
 
-	ret = lh_open(lh, path);
-	if (ret)
-		return ret;
+        rc = lh_client_open_conn(lh->conn, path);
+	if (rc < 0) {
+		eprintf("Cannot estibalish connection\n");
+		return rc;
+	}
 
 	*size = lh->size;
 	return 0;
@@ -194,6 +182,7 @@ static tgtadm_err bs_longhorn_init(struct scsi_lu *lu, char *bsopts)
 	struct bs_thread_info *info = BS_THREAD_I(lu);
 	char *ssize = NULL;
 	size_t size = 0;
+        struct longhorn_info *lh = LHP(lu);
 
 	while (bsopts && strlen(bsopts)) {
 		if (is_opt("size", bsopts)) {
@@ -201,8 +190,14 @@ static tgtadm_err bs_longhorn_init(struct scsi_lu *lu, char *bsopts)
 			size = atoll(ssize);
 		}
 	}
-	LHP(lu)->size = size;
 
+	lh->conn = lh_client_allocate_conn();
+	if (lh->conn == NULL) {
+		perror("Cannot allocate connection\n");
+		return TGTADM_NOMEM;
+	}
+
+	lh->size = size;
 	return bs_thread_open(info, bs_longhorn_request, nr_iothreads);
 }
 
@@ -211,6 +206,9 @@ static void bs_longhorn_exit(struct scsi_lu *lu)
 	struct bs_thread_info *info = BS_THREAD_I(lu);
 
 	bs_thread_close(info);
+
+        lh_client_free_conn(LHP(lu)->conn);
+        LHP(lu)->conn = NULL;
 }
 
 static struct backingstore_template longhorn_bst = {
