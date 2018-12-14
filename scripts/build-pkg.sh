@@ -104,6 +104,7 @@ build_deb() {
     cp -a scripts/deb/* $_TOP/$name/debian
     cd $_TOP/$name
     sed -i -r "s/^tgt \(([0-9.-]+)\) (.*)/tgt \($version-$release\) \2/" debian/changelog
+    export DEB_BUILD_OPTIONS=nostrip
     debuild -uc -us
     check "Failed building deb package."
     cd ../..

@@ -38,6 +38,7 @@ endif
 
 INCLUDES += -I.
 
+CFLAGS += -pg -g
 CFLAGS += -D_GNU_SOURCE
 CFLAGS += $(INCLUDES)
 ifneq ($(DEBUG),)
@@ -49,7 +50,7 @@ CFLAGS += -Wall -Wstrict-prototypes -Werror -fPIC
 CFLAGS += -DTGT_VERSION=\"$(VERSION)$(EXTRAVERSION)\"
 CFLAGS += -DBSDIR=\"$(DESTDIR)$(libdir)/backing-store\"
 
-LIBS += -lpthread -ldl -lrt -llonghorn
+LIBS += -lpthread -ldl -lrt -llonghorn -g -pg
 
 ifneq ($(SD_NOTIFY),)
 LIBS += -lsystemd
