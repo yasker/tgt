@@ -132,6 +132,10 @@ static void bs_longhorn_request(struct scsi_cmd *cmd)
 		lh_client_close_conn(old_conn);
 		lh_client_free_conn(old_conn);
 		break;
+	case SYNCHRONIZE_CACHE:
+	case SYNCHRONIZE_CACHE_16:
+		// Ignore sync since it's synchronized by default
+		break;
 	default:
 		eprintf("unsupported cmd->scb[0]: %x\n", cmd->scb[0]);
 		break;
